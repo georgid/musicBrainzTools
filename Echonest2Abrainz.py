@@ -6,7 +6,7 @@ Created on Nov 18, 2014
 import re
 
 import musicbrainzngs as mb
-import Levenshtein
+# import Levenshtein
 import os
 import fnmatch
 import sys
@@ -14,7 +14,7 @@ mb.set_useragent("Dunya", "0.1")
 mb.set_rate_limit(False)
 mb.set_hostname("musicbrainz.s.upf.edu")
 
-
+import json
 
 
 def match( a, b):
@@ -55,9 +55,10 @@ def load_mbidlist(URIAbzIdList):
 
 class SalamiEntry():
     
-    def __init__(self, title, artist):
+    def __init__(self, title, artist, key):
       self.title= title
-      self.artist = artist  
+      self.artist = artist
+      self.key = key  
     
     
 def search_artist(queryArtistname):
@@ -94,10 +95,10 @@ def search_rec_with_artist(queryRecName, artist, mbSet):
             
             # match recordingMBIDs in ABrainz
             if isRecordingInAbrainz(r, mbSet ):
-                print "found recording with title {} with artist {} and with rec MBID {} in acoustic brainz".format(r["title"], artist["name"], r["id"])
+                print "found recording with title {} with artist {} and with rec MBID {} in acoustic brainz".format(r["title"].encode('utf-8','replace'), artist["name"].encode('utf-8','replace'), r['id'].encode('utf-8','replace') )
                 return r
 
-        if offset > 1000:
+        if offset > 200:
             print "Looked for this song in the 1000 first results but didn't find it, stopping"
             break
     
@@ -124,9 +125,24 @@ def loadQueries(pathbillBoardFiles):
             
             line2 = entries[1].strip()
             artist = line2.split(':')[1].strip()
+            
+            line3 = entries[2].strip()
+            name3 = line3.split(':')[0]
+            
+            line4 = entries[3].strip()
+            name4 = line4.split(':')[0]
+            
+            
+            if name3 == "# tonic":
+                key = line3.split(':')[1].strip()
+            elif name4 == "# tonic":
+                key = line4.split(':')[1].strip()
+            else: sys.exit("no key found. Exiting!") 
+            
+            
             fp.close()
             
-            salamiEntry = SalamiEntry(title, artist)
+            salamiEntry = SalamiEntry(title, artist, key)
             queries.append(salamiEntry)
             URISalamis.append(URIsalami)
     
@@ -201,35 +217,39 @@ def doit(argv):
 
     
     mbSet = load_mbidlist(URIAbzIdList)
-    listMatchedRecordings = []
+    # result: recording MBID -> key
+    matchedDict = {}
     
 #     pathbillBoardFiles= '/Users/joro/Downloads/McGill-Billboard_Chords'
     pathbillBoardFiles = argv[2]
     queries, URISalamis = loadQueries(pathbillBoardFiles)
     
-    for query, currURIsalami in zip(queries, URISalamis): 
-        queryArtist = query.artist
-        queryRecordingTitle = query.title
+    for salamiQuery, currURIsalami in zip(queries, URISalamis): 
+        queryArtist = salamiQuery.artist
+        queryRecordingTitle = salamiQuery.title
         
     #     queryArtist = 'Bette Midler'
     #     queryRecordingTitle = 'The Rose'
 
-        # query artist_MBID by ArtistName  
+        # salamiQuery artist_MBID by ArtistName  
         listArtists = search_artist(queryArtist)
         
         for artist in listArtists:
             
             
-            
-            # query composition_MBID by artist_MBID and Recording Title
+            # salamiQuery composition_MBID by artist_MBID and Recording Title
             recording = search_rec_with_artist(queryRecordingTitle, artist, mbSet)    
             if recording!= None:
                 
-                prependLineToFile(currURIsalami, recording["id"])
+                matchedDict[recording["id"]] = salamiQuery.key
+#                 prependLineToFile(currURIsalami, recording["id"])
+        print matchedDict
                
                 
-                listMatchedRecordings.append(recording)
-    print " Finished! \n {} recordings found ".format(len( listMatchedRecordings))
+    print " Finished! \n {} recordings found ".format(len( matchedDict))
+    # serielize to file 
+    with open('mapRecID2Key.txt', 'w') as f:
+        json.dump(matchedDict, f, sort_keys = True, indent = 4, ensure_ascii=False)
                                                     
 if __name__ == "__main__":
     doit(sys.argv)
