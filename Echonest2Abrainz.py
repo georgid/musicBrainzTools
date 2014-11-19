@@ -10,6 +10,8 @@ import musicbrainzngs as mb
 import os
 import fnmatch
 import sys
+from eyed3.utils.cli import LoggingAction
+import logging
 mb.set_useragent("Dunya", "0.1")
 mb.set_rate_limit(False)
 mb.set_hostname("musicbrainz.s.upf.edu")
@@ -223,8 +225,10 @@ def doit(argv):
 #     pathbillBoardFiles= '/Users/joro/Downloads/McGill-Billboard_Chords'
     pathbillBoardFiles = argv[2]
     queries, URISalamis = loadQueries(pathbillBoardFiles)
+    lengthQueries =len(queries) 
     
-    for salamiQuery, currURIsalami in zip(queries, URISalamis): 
+    for index, (salamiQuery, currURIsalami) in enumerate(zip(queries, URISalamis)):
+        logging.info("finding match for query {} out of {}".format(index, lengthQueries))  
         queryArtist = salamiQuery.artist
         queryRecordingTitle = salamiQuery.title
         
@@ -235,7 +239,6 @@ def doit(argv):
         listArtists = search_artist(queryArtist)
         
         for artist in listArtists:
-            
             
             # salamiQuery composition_MBID by artist_MBID and Recording Title
             recording = search_rec_with_artist(queryRecordingTitle, artist, mbSet)    
